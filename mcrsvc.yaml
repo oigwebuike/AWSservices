@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A sample microservices architecture in a VPC with an EC2 instance, an S3 bucket, and an RDS database.
+
+Resources:
+  # VPC with a public and private subnet
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: microservices-vpc
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: us-east-1a
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: us-east-1a
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: {}
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+  # EC2 instance to host the microservices
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-12345678
+      InstanceType: t2.micro
+      KeyName: mykey
+      SecurityGroupIds:
+        - sg-12345678
+      SubnetId: !Ref PrivateSubnet
+      Tags:
+        - Key: Name
+          Value: microservices-instance
+  # S3 bucket for storing application data
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: my-microservices-bucket
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+  # RDS database for storing application data
+  RDSDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: mydatabase
+      Engine: MySQL
+      MasterUsername: admin
+      MasterUserPassword: mypassword
+      DBInstanceClass: db.t2.micro
+      VPCSecurityGroups:
+        - sg-12345678
+      AllocatedStorage: 20
+      StorageType: gp2
+      VPCId: !Ref VPC
+      PubliclyAccessible: false
+      SubnetGroupName: !Ref DBSubnetGroup
+      Tags:
+        - Key: Name
+          Value: microservices-database
+  # Security group for the RDS database
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow access to RDS database
+      VpcId: !Ref VPC
+  DBSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DBSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      SourceSecurityGroupId: !Ref EC2SecurityGroup
+  # Subnet group for the RDS database
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS database
+      SubnetIds:
+        - !Ref PrivateSubnet
