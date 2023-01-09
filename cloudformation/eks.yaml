@@ -1,0 +1,37 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # Create the EKS cluster
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: my-eks-cluster
+      RoleArn: arn:aws:iam::123456789012:role/EksServiceRole
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - sg-01234567890abcdef
+        SubnetIds:
+          - subnet-01234567890abcdef
+          - subnet-01234567890abcdef
+          - subnet-01234567890abcdef
+  # Create the worker node group
+  EKSWorkerNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref EKSCluster
+      NodegroupName: my-eks-node-group
+      ScalingConfig:
+        DesiredSize: 2
+        MaxSize: 4
+        MinSize: 1
+      DiskSize: 20
+      InstanceTypes:
+        - t2.medium
+      Subnets:
+        - subnet-01234567890abcdef
+        - subnet-01234567890abcdef
+        - subnet-01234567890abcdef
+      AmiType: AL2_x86_64
+      RemoteAccess:
+        Ec2SshKey: my-key-pair
+      NodeRole: arn:aws:iam::123456789012:role/EksNodeRole
